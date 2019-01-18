@@ -35,11 +35,10 @@
     <releaseNotes>See http://htmlrenderer.codeplex.com/releases.</releaseNotes>
     <tags>html render renderer draw control WPF</tags>
     <frameworkAssemblies>
-      <frameworkAssembly assemblyName="System.Windows.Forms" targetFramework="" />
       <frameworkAssembly assemblyName="System.Drawing" targetFramework="" />
     </frameworkAssemblies>
     <dependencies>
-      <dependency id="HtmlRenderer.Core" version="1.5.0.5"/>
+      <dependency id="HtmlRenderer.Core" version="1.5.1-beta1"/>
     </dependencies>
   </metadata>
   <files>

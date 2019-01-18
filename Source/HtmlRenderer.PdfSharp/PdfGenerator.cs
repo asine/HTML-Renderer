@@ -10,14 +10,14 @@
 // - Sun Tsu,
 // "The Art of War"
 
+using PdfSharp;
+using PdfSharp.Drawing;
+using PdfSharp.Pdf;
 using System;
 using TheArtOfDev.HtmlRenderer.Core;
 using TheArtOfDev.HtmlRenderer.Core.Entities;
 using TheArtOfDev.HtmlRenderer.Core.Utils;
 using TheArtOfDev.HtmlRenderer.PdfSharp.Adapters;
-using PdfSharp;
-using PdfSharp.Drawing;
-using PdfSharp.Pdf;
 
 namespace TheArtOfDev.HtmlRenderer.PdfSharp
 {
@@ -89,9 +89,57 @@ namespace TheArtOfDev.HtmlRenderer.PdfSharp
         {
             // create PDF document to render the HTML into
             var document = new PdfDocument();
-            
+
+            // add rendered PDF pages to document
+            AddPdfPages(document, html, config, cssData, stylesheetLoad, imageLoad);
+
+            return document;
+        }
+
+        /// <summary>
+        /// Create PDF pages from given HTML and appends them to the provided PDF document.<br/>
+        /// </summary>
+        /// <param name="document">PDF document to append pages to</param>
+        /// <param name="html">HTML source to create PDF from</param>
+        /// <param name="pageSize">the page size to use for each page in the generated pdf </param>
+        /// <param name="margin">the margin to use between the HTML and the edges of each page</param>
+        /// <param name="cssData">optional: the style to use for html rendering (default - use W3 default style)</param>
+        /// <param name="stylesheetLoad">optional: can be used to overwrite stylesheet resolution logic</param>
+        /// <param name="imageLoad">optional: can be used to overwrite image resolution logic</param>
+        /// <returns>the generated image of the html</returns>
+        public static void AddPdfPages(PdfDocument document, string html, PageSize pageSize, int margin = 20, CssData cssData = null, EventHandler<HtmlStylesheetLoadEventArgs> stylesheetLoad = null, EventHandler<HtmlImageLoadEventArgs> imageLoad = null)
+        {
+            var config = new PdfGenerateConfig();
+            config.PageSize = pageSize;
+            config.SetMargins(margin);
+            AddPdfPages(document, html, config, cssData, stylesheetLoad, imageLoad);
+        }
+
+        /// <summary>
+        /// Create PDF pages from given HTML and appends them to the provided PDF document.<br/>
+        /// </summary>
+        /// <param name="document">PDF document to append pages to</param>
+        /// <param name="html">HTML source to create PDF from</param>
+        /// <param name="config">the configuration to use for the PDF generation (page size/page orientation/margins/etc.)</param>
+        /// <param name="cssData">optional: the style to use for html rendering (default - use W3 default style)</param>
+        /// <param name="stylesheetLoad">optional: can be used to overwrite stylesheet resolution logic</param>
+        /// <param name="imageLoad">optional: can be used to overwrite image resolution logic</param>
+        /// <returns>the generated image of the html</returns>
+        public static void AddPdfPages(PdfDocument document, string html, PdfGenerateConfig config, CssData cssData = null, EventHandler<HtmlStylesheetLoadEventArgs> stylesheetLoad = null, EventHandler<HtmlImageLoadEventArgs> imageLoad = null)
+        {
+            XSize orgPageSize;
             // get the size of each page to layout the HTML in
-            var orgPageSize = PageSizeConverter.ToSize(config.PageSize);
+            if (config.PageSize != PageSize.Undefined)
+                orgPageSize = PageSizeConverter.ToSize(config.PageSize);
+            else
+                orgPageSize = config.ManualPageSize;
+
+            if (config.PageOrientation == PageOrientation.Landscape)
+            {
+                // invert pagesize for landscape
+                orgPageSize = new XSize(orgPageSize.Height, orgPageSize.Width);
+            }
+
             var pageSize = new XSize(orgPageSize.Width - config.MarginLeft - config.MarginRight, orgPageSize.Height - config.MarginTop - config.MarginBottom);
 
             if (!string.IsNullOrEmpty(html))
@@ -106,6 +154,11 @@ namespace TheArtOfDev.HtmlRenderer.PdfSharp
                     container.Location = new XPoint(config.MarginLeft, config.MarginTop);
                     container.MaxSize = new XSize(pageSize.Width, 0);
                     container.SetHtml(html, cssData);
+                    container.PageSize = pageSize;
+                    container.MarginBottom = config.MarginBottom;
+                    container.MarginLeft = config.MarginLeft;
+                    container.MarginRight = config.MarginRight;
+                    container.MarginTop = config.MarginTop;
 
                     // layout the HTML with the page width restriction to know how many pages are required
                     using (var measure = XGraphics.CreateMeasureContext(pageSize, XGraphicsUnit.Point, XPageDirection.Downwards))
@@ -118,10 +171,13 @@ namespace TheArtOfDev.HtmlRenderer.PdfSharp
                     while (scrollOffset > -container.ActualSize.Height)
                     {
                         var page = document.AddPage();
-                        page.Size = config.PageSize;
+                        page.Height = orgPageSize.Height;
+                        page.Width = orgPageSize.Width;
+
                         using (var g = XGraphics.FromPdfPage(page))
                         {
-                            g.IntersectClip(new XRect(config.MarginLeft, config.MarginTop, pageSize.Width, pageSize.Height));
+                            //g.IntersectClip(new XRect(config.MarginLeft, config.MarginTop, pageSize.Width, pageSize.Height));
+                            g.IntersectClip(new XRect(0, 0, page.Width, page.Height));
 
                             container.ScrollOffset = new XPoint(0, scrollOffset);
                             container.PerformPaint(g);
@@ -133,9 +189,8 @@ namespace TheArtOfDev.HtmlRenderer.PdfSharp
                     HandleLinks(document, container, orgPageSize, pageSize);
                 }
             }
-
-            return document;
         }
+
 
 
         #region Private/Protected methods
